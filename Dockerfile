@@ -1,39 +1,29 @@
-# Version 1.0 template-transformer-simple 
-FROM opendronemap/odm:0.9.1
-LABEL maintainer="Chris Schnaufer <schnaufer@email.arizona.edu>"
+FROM opendronemap/odm:0.9.1 as builder
+WORKDIR /
 
-RUN useradd -u 49044 extractor \
-    && mkdir /home/extractor \
-    && chown -R extractor /home/extractor \
-    && chgrp -R extractor /home/extractor
+FROM phusion/baseimage
+# Env variables
+ENV DEBIAN_FRONTEND noninteractive
+WORKDIR /
+COPY --from=builder /code /code
 
-COPY requirements.txt packages.txt /home/extractor/
+#Install dependencies
+RUN apt-get update -y \
+    && apt-get install --no-install-recommends -y \
+    software-properties-common \
+    python3-pip \
+    && python3 -m pip install --upgrade pip \
+    && python3 -m pip install setuptools
 
-USER root
+RUN python3 -m pip install scif==0.0.81
 
-RUN [ -s /home/extractor/packages.txt ] && \
-    (echo 'Installing packages' && \
-        apt-get update && \
-        cat /home/extractor/packages.txt | xargs apt-get install -y --no-install-recommends && \
-        rm /home/extractor/packages.txt && \
-        apt-get autoremove -y && \
-        apt-get clean && \
-        rm -rf /var/lib/apt/lists/*) || \
-    (echo 'No packages to install' && \
-        rm /home/extractor/packages.txt)
+# Install the filesystem from the recipe
+COPY *.scif /
+RUN scif install /recipe.scif
 
-RUN [ -s /home/extractor/requirements.txt ] && \
-    (echo 'Install python modules' && \
-    python3 -m pip install -U --no-cache-dir pip && \
-    python3 -m pip install --no-cache-dir setuptools && \
-    python3 -m pip install --no-cache-dir -r /home/extractor/requirements.txt && \
-    rm /home/extractor/requirements.txt) || \
-    (echo 'No python modules to install' && \
-     rm /home/extractor/requirements.txt)
+# Cleanup APT
+RUN apt-get clean \
+  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-USER extractor
-ENTRYPOINT ["/home/extractor/entrypoint.py"]
-
-COPY *.py settings.yaml /home/extractor/
-
-ENV PYTHONPATH="${PYTHONPATH}:/code"
+# SciF Entrypoint
+ENTRYPOINT ["scif"]
