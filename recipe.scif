@@ -5,6 +5,7 @@
     export PYTHONPATH="$PYTHONPATH:/code/SuperBuild/install/lib/python2.7/dist-packages"
     export PYTHONPATH="$PYTHONPATH:/code/SuperBuild/src/opensfm"
     export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/code/SuperBuild/install/lib"
+    PATH=~/miniconda3/bin:$PATH
 %appinstall odm
     add-apt-repository -y ppa:ubuntugis/ubuntugis-unstable
     apt-get update -y
@@ -56,5 +57,19 @@
     python -m pip install --upgrade pip
     python -m pip install setuptools
     python -m pip install -r /code/requirements.txt
+
+    # Install conda packages:
+    ~/miniconda3/bin/conda env create --prefix "${PWD}/conda" -f src/environment.yml
+
+    # To regenerate src/environment.yml:
+    # ~/miniconda3/bin/conda create --prefix "${PWD}/conda" --yes -c conda-forge gdal scikit-image opencv PyYAML cfunits influxdb matplotlib netCDF4 numpy Pillow python-dateutil scipy utm python-logstash pika requests-toolbelt laspy piexif
+    # ~/miniconda3/bin/conda env export --prefix "${PWD}/conda" > src/environment.yml
+
+    # Install terrautils:
+    mkdir tmp
+    git clone --branch master --single-branch --depth 1 https://github.com/terraref/terrautils.git tmp/terrautils
+    ~/miniconda3/bin/conda run --prefix "${PWD}/conda" python3 -m pip install --no-deps pyclowder
+    ~/miniconda3/bin/conda run --prefix "${PWD}/conda" python3 -m pip install --no-deps tmp/terrautils
+    rm -rf tmp/terrautils
 %apprun odm
-    exec python /code/run.py "${@}"
+    exec conda run --prefix "${SCIF_APPROOT}/conda" src/entrypoint.py "${@}"
